@@ -23,11 +23,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-md bg-primary/15 text-primary">
+            <span className="flex size-8 items-center justify-center rounded-md bg-foreground text-background">
               <Radio className="size-4" />
             </span>
             <span className="font-display text-sm font-semibold tracking-tight sm:text-base">
-              Recruit<span className="text-primary">Ops</span>
+              RecruitOps
             </span>
           </Link>
 
