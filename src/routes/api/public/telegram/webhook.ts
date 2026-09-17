@@ -149,7 +149,21 @@ async function handleMessage(settings: BotSettings, update: TelegramUpdate) {
     })
     .select("*")
     .single();
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    await store.from("bot_sessions").update({ active: false, step: 0, answers: [] }).eq("chat_id", chatId);
+    // Unique violation: this Telegram user already has an application on file.
+    // Defends against double-submits (e.g. two near-simultaneous requests)
+    // even though we already check for this before starting the survey.
+    if (error.code === "23505" && settings.bot_token) {
+      await telegramApi(settings.bot_token, "sendMessage", {
+        chat_id: chatId,
+        text: "⚠️ Вы уже подавали заявку ранее. Повторная подача недоступна.",
+      });
+      return;
+    }
+    throw new Error(error.message);
+  }
 
   await store.from("bot_sessions").update({ active: false, step: 0, answers: [] }).eq("chat_id", chatId);
 
@@ -175,12 +189,41 @@ async function handleCallback(settings: BotSettings, update: TelegramUpdate) {
 
   if (data === "apply") {
     const chatId = callback.message?.chat.id;
+    const userId = callback.from?.id;
     if (!chatId) return;
     if (settings.questions.length === 0) {
       await answer("Анкета пока не настроена.");
       return;
     }
     const store = await db();
+
+    if (userId) {
+      const { data: existing } = await store
+        .from("applications")
+        .select("status, created_at")
+        .eq("telegram_user_id", userId)
+        .maybeSingle();
+      if (existing) {
+        await answer("Вы уже подавали заявку.");
+        const statusText =
+          existing.status === "pending"
+            ? "⏳ она ещё на рассмотрении. Дождитесь решения — оно придёт сюда."
+            : existing.status === "approved"
+              ? "✅ она уже одобрена. Повторная подача недоступна."
+              : "❌ она была отклонена. Повторная подача недоступна.";
+        if (settings.bot_token) {
+          const submittedAt = existing.created_at
+            ? new Date(existing.created_at).toLocaleDateString("ru-RU")
+            : null;
+          await telegramApi(settings.bot_token, "sendMessage", {
+            chat_id: chatId,
+            text: `Вы уже подавали заявку${submittedAt ? ` ${submittedAt}` : ""}: ${statusText}`,
+          });
+        }
+        return;
+      }
+    }
+
     await store.from("bot_sessions").upsert({
       chat_id: chatId,
       telegram_user_id: callback.from?.id ?? null,
