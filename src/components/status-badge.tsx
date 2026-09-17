@@ -1,3 +1,5 @@
+import { Check, Clock, X } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 export type AppStatus = "pending" | "approved" | "rejected";
@@ -8,16 +10,27 @@ export const STATUS_LABELS: Record<AppStatus, string> = {
   rejected: "Отклонено",
 };
 
+// Monochrome status system: pending is a neutral outline, approved is a
+// solid filled badge (highest emphasis, no color needed to read as
+// "positive"), and rejected is the one place that keeps a muted accent
+// color, since it's an irreversible outcome worth flagging at a glance.
 const STATUS_STYLES: Record<AppStatus, string> = {
-  pending: "bg-warning/15 text-warning border-warning/30",
-  approved: "bg-success/15 text-success border-success/30",
-  rejected: "bg-destructive/15 text-destructive border-destructive/30",
+  pending: "border-border bg-muted text-muted-foreground",
+  approved: "border-transparent bg-foreground text-background",
+  rejected: "border-destructive/25 bg-destructive/10 text-destructive",
+};
+
+const STATUS_ICONS: Record<AppStatus, typeof Check> = {
+  pending: Clock,
+  approved: Check,
+  rejected: X,
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {
   const key = (["pending", "approved", "rejected"] as AppStatus[]).includes(status as AppStatus)
     ? (status as AppStatus)
     : "pending";
+  const Icon = STATUS_ICONS[key];
   return (
     <span
       className={cn(
@@ -26,7 +39,7 @@ export function StatusBadge({ status, className }: { status: string; className?:
         className,
       )}
     >
-      <span className="size-1.5 rounded-full bg-current" />
+      <Icon className="size-3" strokeWidth={2.5} />
       {STATUS_LABELS[key]}
     </span>
   );
