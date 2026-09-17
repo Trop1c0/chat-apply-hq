@@ -1,0 +1,7 @@
+-- Enforce a single application per Telegram user, at the database level.
+-- The bot already checks this before starting the questionnaire, but this
+-- constraint is the source of truth: it protects against races (e.g. two
+-- near-simultaneous submissions) and any future code path that inserts
+-- into applications directly.
+ALTER TABLE public.applications
+  ADD CONSTRAINT applications_telegram_user_id_key UNIQUE (telegram_user_id);
