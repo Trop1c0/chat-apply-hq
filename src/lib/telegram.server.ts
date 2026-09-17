@@ -20,6 +20,7 @@ export type ApplicationRow = {
   answers: { question: string; answer: string }[];
   status: string;
   admin_message_id: number | null;
+  created_at?: string;
 };
 
 async function admin() {
@@ -60,20 +61,61 @@ export async function telegramApi<T = any>(
   return body.result as T;
 }
 
-export function describeApplication(app: ApplicationRow): string {
+const KEYCAPS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+function numberEmoji(index: number): string {
+  return KEYCAPS[index] ?? `${index + 1}.`;
+}
+
+const STATUS_LINE: Record<string, string> = {
+  pending: "⏳ <b>На рассмотрении</b>",
+  approved: "✅ <b>Одобрено</b>",
+  rejected: "❌ <b>Отклонено</b>",
+};
+
+const DIVIDER = "────────────────────";
+
+export function describeApplication(
+  app: ApplicationRow,
+  options?: { status?: string; decidedLabel?: string },
+): string {
+  const status = options?.status ?? app.status;
   const name = app.full_name ?? "Без имени";
   const username = app.telegram_username ? `@${app.telegram_username}` : "—";
+  const submittedAt = app.created_at
+    ? new Date(app.created_at).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
   const answers = app.answers
-    .map((entry, index) => `${index + 1}. ${entry.question}\n   ${entry.answer}`)
-    .join("\n");
+    .map(
+      (entry, index) =>
+        `${numberEmoji(index)} <b>${escapeHtml(entry.question)}</b>\n     ${escapeHtml(entry.answer)}`,
+    )
+    .join("\n\n");
+
+  const statusLine = options?.decidedLabel
+    ? `${STATUS_LINE[status] ?? escapeHtml(status)} · ${escapeHtml(options.decidedLabel)}`
+    : (STATUS_LINE[status] ?? escapeHtml(status));
+
   return [
-    "🆕 <b>Новая заявка</b>",
-    "",
-    `👤 ${escapeHtml(name)} (${escapeHtml(username)})`,
+    "🆕 <b>Заявка на вступление</b>",
+    DIVIDER,
+    `👤 <b>${escapeHtml(name)}</b>`,
+    `🔗 ${escapeHtml(username)}`,
     `🆔 <code>${app.telegram_user_id}</code>`,
     app.discord ? `💬 Discord: ${escapeHtml(app.discord)}` : null,
+    submittedAt ? `🕐 Подана: ${submittedAt}` : null,
+    DIVIDER,
+    "📋 <b>Анкета</b>",
     "",
-    escapeHtml(answers),
+    answers,
+    DIVIDER,
+    `Статус: ${statusLine}`,
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -139,14 +181,16 @@ export async function decideApplication(options: {
     }
 
     if (settings.admin_group_id && app.admin_message_id) {
-      const badge = options.status === "approved" ? "✅ Одобрено" : "❌ Отклонено";
-      const by = options.decidedLabel ? ` · ${escapeHtml(options.decidedLabel)}` : "";
       try {
         await telegramApi(settings.bot_token, "editMessageText", {
           chat_id: settings.admin_group_id,
           message_id: app.admin_message_id,
-          text: `${describeApplication(app)}\n\n<b>${badge}</b>${by}`,
+          text: describeApplication(app, {
+            status: options.status,
+            decidedLabel: options.decidedLabel,
+          }),
           parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [] },
         });
       } catch (error) {
         console.error("Could not update the admin group message", error);
@@ -160,18 +204,20 @@ export async function decideApplication(options: {
 export async function notifyAdminGroup(app: ApplicationRow): Promise<void> {
   const settings = await loadSettings();
   if (!settings.bot_token || !settings.admin_group_id) return;
+  const keyboard: { text: string; callback_data?: string; url?: string }[][] = [
+    [
+      { text: "✅ Одобрить", callback_data: `approve:${app.id}` },
+      { text: "❌ Отклонить", callback_data: `reject:${app.id}` },
+    ],
+  ];
+  if (app.telegram_username) {
+    keyboard.push([{ text: "🔗 Открыть профиль", url: `https://t.me/${app.telegram_username}` }]);
+  }
   const result = await telegramApi<{ message_id: number }>(settings.bot_token, "sendMessage", {
     chat_id: settings.admin_group_id,
     text: describeApplication(app),
     parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Одобрить", callback_data: `approve:${app.id}` },
-          { text: "❌ Отклонить", callback_data: `reject:${app.id}` },
-        ],
-      ],
-    },
+    reply_markup: { inline_keyboard: keyboard },
   });
   const db = await admin();
   await db.from("applications").update({ admin_message_id: result.message_id }).eq("id", app.id);
