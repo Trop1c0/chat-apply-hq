@@ -66,65 +66,69 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.03] [background-image:linear-gradient(var(--color-foreground)_1px,transparent_1px),linear-gradient(90deg,var(--color-foreground)_1px,transparent_1px)] [background-size:40px_40px]"
+      />
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+      <div className="relative w-full max-w-sm">
+        <div className="mb-8 flex items-center justify-center gap-2">
+          <span className="flex size-9 items-center justify-center rounded-md bg-foreground text-background">
             <Radio className="size-4" />
           </span>
-          <span className="font-display text-lg font-semibold">
-            Recruit<span className="text-primary">Ops</span>
-          </span>
+          <span className="font-display text-lg font-semibold">RecruitOps</span>
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {mode === "signin" ? "Вход для админов" : "Регистрация админа"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin"
-            ? "Доступ к заявкам только для администраторов."
-            : "Первый зарегистрированный аккаунт получает права администратора."}
-        </p>
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {mode === "signin" ? "Вход для админов" : "Регистрация админа"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mode === "signin"
+              ? "Доступ к заявкам только для администраторов."
+              : "Первый зарегистрированный аккаунт получает права администратора."}
+          </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Пароль</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              minLength={6}
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Подождите…" : mode === "signin" ? "Войти" : "Создать аккаунт"}
-          </Button>
-        </form>
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Пароль</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                minLength={6}
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "Подождите…" : mode === "signin" ? "Войти" : "Создать аккаунт"}
+            </Button>
+          </form>
 
-        <button
-          type="button"
-          className="mt-4 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        >
-          {mode === "signin" ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
-        </button>
+          <button
+            type="button"
+            className="mt-4 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          >
+            {mode === "signin" ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
+          </button>
+        </div>
       </div>
     </div>
   );
