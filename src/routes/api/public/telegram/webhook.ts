@@ -56,6 +56,26 @@ async function db() {
   return supabaseAdmin as unknown as { from: (table: string) => any };
 }
 
+/**
+ * Looks up a Telegram user's application. Some accounts ended up with more
+ * than one row before duplicate submissions were blocked at the DB level, so
+ * this can't use `.maybeSingle()` (it throws on >1 row, which silently made
+ * `/start` treat already-approved users as if they'd never applied). Prefers
+ * an approved row when one exists, otherwise the most recent submission.
+ */
+async function findApplication(
+  store: { from: (table: string) => any },
+  telegramUserId: number,
+): Promise<{ status: string; created_at?: string } | null> {
+  const { data } = await store
+    .from("applications")
+    .select("status, created_at")
+    .eq("telegram_user_id", telegramUserId)
+    .order("created_at", { ascending: false });
+  if (!Array.isArray(data) || data.length === 0) return null;
+  return data.find((row: { status: string }) => row.status === "approved") ?? data[0];
+}
+
 async function sendWelcome(settings: BotSettings, chatId: number, user: TelegramUser | undefined) {
   if (!settings.bot_token) return;
 
@@ -63,11 +83,7 @@ async function sendWelcome(settings: BotSettings, chatId: number, user: Telegram
   let approved = false;
   if (user) {
     const store = await db();
-    const { data: application } = await store
-      .from("applications")
-      .select("status")
-      .eq("telegram_user_id", user.id)
-      .maybeSingle();
+    const application = await findApplication(store, user.id);
     if (application) {
       statusLabel = APPLICATION_STATUS_LABEL[application.status] ?? application.status;
       approved = application.status === "approved";
@@ -278,11 +294,7 @@ async function handleCallback(settings: BotSettings, update: TelegramUpdate) {
     const store = await db();
 
     if (userId) {
-      const { data: existing } = await store
-        .from("applications")
-        .select("status, created_at")
-        .eq("telegram_user_id", userId)
-        .maybeSingle();
+      const existing = await findApplication(store, userId);
       if (existing) {
         await answer("Вы уже подавали заявку.");
         const statusText =
