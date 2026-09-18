@@ -5,6 +5,7 @@ export type BotSettings = {
   admin_group_id: string | null;
   webhook_secret: string;
   welcome_message: string;
+  welcome_image_url: string | null;
   questions: string[];
   approve_template: string;
   reject_template: string;
@@ -70,6 +71,12 @@ const STATUS_LINE: Record<string, string> = {
   pending: "⏳ <b>На рассмотрении</b>",
   approved: "✅ <b>Одобрено</b>",
   rejected: "❌ <b>Отклонено</b>",
+};
+
+export const APPLICATION_STATUS_LABEL: Record<string, string> = {
+  pending: "⏳ на рассмотрении",
+  approved: "✅ одобрена",
+  rejected: "❌ отклонена",
 };
 
 const DIVIDER = "────────────────────";

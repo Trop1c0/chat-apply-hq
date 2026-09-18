@@ -87,6 +87,7 @@ function SettingsPage() {
   const [botToken, setBotToken] = useState("");
   const [adminGroupId, setAdminGroupId] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [welcomeImageUrl, setWelcomeImageUrl] = useState("");
   const [questions, setQuestions] = useState<string[]>([]);
   const [approveTemplate, setApproveTemplate] = useState("");
   const [rejectTemplate, setRejectTemplate] = useState("");
@@ -95,6 +96,7 @@ function SettingsPage() {
     if (!data) return;
     setAdminGroupId(data.adminGroupId);
     setWelcomeMessage(data.welcomeMessage);
+    setWelcomeImageUrl(data.welcomeImageUrl);
     setQuestions(data.questions);
     setApproveTemplate(data.approveTemplate);
     setRejectTemplate(data.rejectTemplate);
@@ -107,6 +109,7 @@ function SettingsPage() {
           botToken: botToken.trim(),
           adminGroupId,
           welcomeMessage,
+          welcomeImageUrl: welcomeImageUrl.trim(),
           questions: questions.map((question) => question.trim()).filter((q) => q.length > 0),
           approveTemplate,
           rejectTemplate,
@@ -181,12 +184,31 @@ function SettingsPage() {
             </div>
           </Section>
 
-          <Section title="Приветствие" description="Первое сообщение после команды /start.">
-            <Textarea
-              rows={4}
-              value={welcomeMessage}
-              onChange={(event) => setWelcomeMessage(event.target.value)}
-            />
+          <Section
+            title="Приветствие"
+            description="Главное меню по команде /start: баннер, текст и профиль кандидата (имя, username, id, статус заявки)."
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="welcome-image">Баннер-картинка (URL, необязательно)</Label>
+              <Input
+                id="welcome-image"
+                placeholder="https://…/banner.png"
+                value={welcomeImageUrl}
+                onChange={(event) => setWelcomeImageUrl(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Прямая ссылка на изображение. Если оставить пустым, меню отправится обычным
+                сообщением без картинки.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Текст под заголовком «Главное меню»</Label>
+              <Textarea
+                rows={4}
+                value={welcomeMessage}
+                onChange={(event) => setWelcomeMessage(event.target.value)}
+              />
+            </div>
           </Section>
 
           <Section

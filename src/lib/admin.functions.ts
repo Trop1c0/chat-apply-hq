@@ -24,6 +24,7 @@ export type AdminSettings = {
   tokenHint: string | null;
   adminGroupId: string;
   welcomeMessage: string;
+  welcomeImageUrl: string;
   questions: string[];
   approveTemplate: string;
   rejectTemplate: string;
@@ -42,6 +43,7 @@ export const getSettings = createServerFn({ method: "GET" })
       tokenHint: token.length > 0 ? `${token.slice(0, 6)}…${token.slice(-4)}` : null,
       adminGroupId: settings.admin_group_id ?? "",
       welcomeMessage: settings.welcome_message,
+      welcomeImageUrl: settings.welcome_image_url ?? "",
       questions: settings.questions,
       approveTemplate: settings.approve_template,
       rejectTemplate: settings.reject_template,
@@ -53,6 +55,12 @@ const settingsSchema = z.object({
   botToken: z.string().trim().optional(),
   adminGroupId: z.string().trim().max(64),
   welcomeMessage: z.string().trim().min(1).max(2000),
+  welcomeImageUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => value.length === 0 || /^https?:\/\//.test(value), "Введите корректную ссылку")
+    .optional(),
   questions: z.array(z.string().trim().min(1).max(300)).min(1).max(15),
   approveTemplate: z.string().trim().min(1).max(2000),
   rejectTemplate: z.string().trim().min(1).max(2000),
@@ -67,6 +75,7 @@ export const saveSettings = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = {
       admin_group_id: data.adminGroupId || null,
       welcome_message: data.welcomeMessage,
+      welcome_image_url: data.welcomeImageUrl || null,
       questions: data.questions,
       approve_template: data.approveTemplate,
       reject_template: data.rejectTemplate,

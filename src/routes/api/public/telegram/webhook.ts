@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
+  APPLICATION_STATUS_LABEL,
   decideApplication,
+  escapeHtml,
   loadSettings,
   notifyAdminGroup,
   telegramApi,
@@ -49,15 +51,55 @@ async function db() {
   return supabaseAdmin as unknown as { from: (table: string) => any };
 }
 
-async function sendWelcome(settings: BotSettings, chatId: number) {
+async function sendWelcome(settings: BotSettings, chatId: number, user: TelegramUser | undefined) {
   if (!settings.bot_token) return;
-  await telegramApi(settings.bot_token, "sendMessage", {
-    chat_id: chatId,
-    text: settings.welcome_message,
-    reply_markup: {
-      inline_keyboard: [[{ text: "📝 Подать заявку", callback_data: "apply" }]],
-    },
-  });
+
+  let statusLabel = "не подана";
+  let approved = false;
+  if (user) {
+    const store = await db();
+    const { data: application } = await store
+      .from("applications")
+      .select("status")
+      .eq("telegram_user_id", user.id)
+      .maybeSingle();
+    if (application) {
+      statusLabel = APPLICATION_STATUS_LABEL[application.status] ?? application.status;
+      approved = application.status === "approved";
+    }
+  }
+
+  const caption = [
+    `${approved ? "🔓" : "🔒"} <b>Главное меню</b>`,
+    "",
+    escapeHtml(settings.welcome_message),
+    "",
+    `👤 <b>${escapeHtml(fullName(user) ?? "Без имени")}</b>`,
+    `🔗 ${user?.username ? `@${escapeHtml(user.username)}` : "—"}`,
+    `🆔 <code>${user?.id ?? chatId}</code>`,
+    `📋 Статус заявки: ${statusLabel}`,
+  ].join("\n");
+
+  const reply_markup = approved
+    ? undefined
+    : { inline_keyboard: [[{ text: "📝 Подать заявку", callback_data: "apply" }]] };
+
+  if (settings.welcome_image_url) {
+    await telegramApi(settings.bot_token, "sendPhoto", {
+      chat_id: chatId,
+      photo: settings.welcome_image_url,
+      caption,
+      parse_mode: "HTML",
+      reply_markup,
+    });
+  } else {
+    await telegramApi(settings.bot_token, "sendMessage", {
+      chat_id: chatId,
+      text: caption,
+      parse_mode: "HTML",
+      reply_markup,
+    });
+  }
 }
 
 async function askQuestion(settings: BotSettings, chatId: number, step: number) {
@@ -95,7 +137,7 @@ async function handleMessage(settings: BotSettings, update: TelegramUpdate) {
       answers: [],
       active: false,
     });
-    await sendWelcome(settings, chatId);
+    await sendWelcome(settings, chatId, message.from);
     return;
   }
 
@@ -106,7 +148,7 @@ async function handleMessage(settings: BotSettings, update: TelegramUpdate) {
     .maybeSingle();
 
   if (!session || !session.active) {
-    await sendWelcome(settings, chatId);
+    await sendWelcome(settings, chatId, message.from);
     return;
   }
 
