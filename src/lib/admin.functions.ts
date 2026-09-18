@@ -19,6 +19,9 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden: admin access required");
 }
 
+export type ManualSetting = { title: string; text: string; url: string };
+export type ModeratorSetting = { label: string; url: string };
+
 export type AdminSettings = {
   hasToken: boolean;
   tokenHint: string | null;
@@ -28,6 +31,12 @@ export type AdminSettings = {
   questions: string[];
   approveTemplate: string;
   rejectTemplate: string;
+  manualsBannerUrl: string;
+  manualsIntro: string;
+  manuals: ManualSetting[];
+  helpBannerUrl: string;
+  helpIntro: string;
+  moderators: ModeratorSetting[];
   webhookUrls: typeof WEBHOOK_URLS;
 };
 
@@ -47,23 +56,55 @@ export const getSettings = createServerFn({ method: "GET" })
       questions: settings.questions,
       approveTemplate: settings.approve_template,
       rejectTemplate: settings.reject_template,
+      manualsBannerUrl: settings.manuals_banner_url ?? "",
+      manualsIntro: settings.manuals_intro,
+      manuals: settings.manuals.map((manual) => ({
+        title: manual.title,
+        text: manual.text ?? "",
+        url: manual.url ?? "",
+      })),
+      helpBannerUrl: settings.help_banner_url ?? "",
+      helpIntro: settings.help_intro,
+      moderators: settings.moderators.map((moderator) => ({
+        label: moderator.label,
+        url: moderator.url,
+      })),
       webhookUrls: WEBHOOK_URLS,
     };
   });
+
+const urlField = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => value.length === 0 || /^https?:\/\//.test(value), "Введите корректную ссылку")
+  .optional();
+
+const manualSchema = z.object({
+  title: z.string().trim().min(1).max(100),
+  text: z.string().trim().max(4000).optional(),
+  url: urlField,
+});
+
+const moderatorSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+  url: z.string().trim().min(1).max(300).refine((value) => /^https?:\/\//.test(value), "Введите корректную ссылку"),
+});
 
 const settingsSchema = z.object({
   botToken: z.string().trim().optional(),
   adminGroupId: z.string().trim().max(64),
   welcomeMessage: z.string().trim().min(1).max(2000),
-  welcomeImageUrl: z
-    .string()
-    .trim()
-    .max(500)
-    .refine((value) => value.length === 0 || /^https?:\/\//.test(value), "Введите корректную ссылку")
-    .optional(),
+  welcomeImageUrl: urlField,
   questions: z.array(z.string().trim().min(1).max(300)).min(1).max(15),
   approveTemplate: z.string().trim().min(1).max(2000),
   rejectTemplate: z.string().trim().min(1).max(2000),
+  manualsBannerUrl: urlField,
+  manualsIntro: z.string().trim().min(1).max(2000),
+  manuals: z.array(manualSchema).max(15),
+  helpBannerUrl: urlField,
+  helpIntro: z.string().trim().min(1).max(2000),
+  moderators: z.array(moderatorSchema).max(15),
 });
 
 export const saveSettings = createServerFn({ method: "POST" })
@@ -79,6 +120,16 @@ export const saveSettings = createServerFn({ method: "POST" })
       questions: data.questions,
       approve_template: data.approveTemplate,
       reject_template: data.rejectTemplate,
+      manuals_banner_url: data.manualsBannerUrl || null,
+      manuals_intro: data.manualsIntro,
+      manuals: data.manuals.map((manual) => ({
+        title: manual.title,
+        text: manual.text || undefined,
+        url: manual.url || undefined,
+      })),
+      help_banner_url: data.helpBannerUrl || null,
+      help_intro: data.helpIntro,
+      moderators: data.moderators,
     };
     if (data.botToken && data.botToken.length > 0) patch["bot_token"] = data.botToken;
     const { error } = await (supabaseAdmin as any)

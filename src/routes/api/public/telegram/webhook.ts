@@ -6,9 +6,11 @@ import {
   escapeHtml,
   loadSettings,
   notifyAdminGroup,
+  sendBannerMessage,
   telegramApi,
   type ApplicationRow,
   type BotSettings,
+  type InlineButton,
 } from "@/lib/telegram.server";
 
 type TelegramUser = {
@@ -80,31 +82,46 @@ async function sendWelcome(settings: BotSettings, chatId: number, user: Telegram
     `📋 Статус заявки: ${statusLabel}`,
   ].join("\n");
 
-  const reply_markup = approved
-    ? undefined
-    : { inline_keyboard: [[{ text: "📝 Подать заявку", callback_data: "apply" }]] };
+  const keyboard: InlineButton[][] = approved
+    ? [
+        [
+          { text: "📘 Мануалы", callback_data: "manuals" },
+          { text: "🆘 Помощь", callback_data: "help" },
+        ],
+      ]
+    : [[{ text: "📝 Подать заявку", callback_data: "apply" }]];
 
-  if (settings.welcome_image_url) {
-    try {
-      await telegramApi(settings.bot_token, "sendPhoto", {
-        chat_id: chatId,
-        photo: settings.welcome_image_url,
-        caption,
-        parse_mode: "HTML",
-        reply_markup,
-      });
-      return;
-    } catch (error) {
-      console.error("sendPhoto failed, falling back to text welcome", error);
-    }
-  }
+  await sendBannerMessage(settings.bot_token, chatId, settings.welcome_image_url, caption, keyboard);
+}
 
-  await telegramApi(settings.bot_token, "sendMessage", {
-    chat_id: chatId,
-    text: caption,
-    parse_mode: "HTML",
-    reply_markup,
-  });
+async function sendManuals(settings: BotSettings, chatId: number) {
+  if (!settings.bot_token) return;
+  const text = [`📚 <b>Мануалы</b>`, "", escapeHtml(settings.manuals_intro)].join("\n");
+  const keyboard: InlineButton[][] = settings.manuals.map((manual, index) => [
+    manual.url ? { text: manual.title, url: manual.url } : { text: manual.title, callback_data: `manual:${index}` },
+  ]);
+  keyboard.push([{ text: "◀️ Назад", callback_data: "menu" }]);
+  await sendBannerMessage(settings.bot_token, chatId, settings.manuals_banner_url, text, keyboard);
+}
+
+async function sendManual(settings: BotSettings, chatId: number, index: number) {
+  if (!settings.bot_token) return;
+  const manual = settings.manuals[index];
+  if (!manual) return;
+  const text = [`📘 <b>${escapeHtml(manual.title)}</b>`, "", escapeHtml(manual.text ?? "")].join("\n");
+  await sendBannerMessage(settings.bot_token, chatId, null, text, [
+    [{ text: "◀️ Назад", callback_data: "manuals" }],
+  ]);
+}
+
+async function sendHelp(settings: BotSettings, chatId: number) {
+  if (!settings.bot_token) return;
+  const text = [`🆘 <b>Помощь</b>`, "", escapeHtml(settings.help_intro)].join("\n");
+  const keyboard: InlineButton[][] = settings.moderators.map((moderator) => [
+    { text: moderator.label, url: moderator.url },
+  ]);
+  keyboard.push([{ text: "◀️ Назад", callback_data: "menu" }]);
+  await sendBannerMessage(settings.bot_token, chatId, settings.help_banner_url, text, keyboard);
 }
 
 async function askQuestion(settings: BotSettings, chatId: number, step: number) {
@@ -226,11 +243,11 @@ async function handleMessage(settings: BotSettings, update: TelegramUpdate) {
 async function handleCallback(settings: BotSettings, update: TelegramUpdate) {
   const callback = update.callback_query!;
   const data = callback.data ?? "";
-  const answer = async (text: string) => {
+  const answer = async (text?: string) => {
     if (!settings.bot_token) return;
     await telegramApi(settings.bot_token, "answerCallbackQuery", {
       callback_query_id: callback.id,
-      text,
+      ...(text ? { text } : {}),
     });
   };
 
@@ -280,6 +297,25 @@ async function handleCallback(settings: BotSettings, update: TelegramUpdate) {
     });
     await answer("Начинаем!");
     await askQuestion(settings, chatId, 0);
+    return;
+  }
+
+  if (data === "menu" || data === "manuals" || data === "help") {
+    const chatId = callback.message?.chat.id;
+    if (!chatId) return;
+    await answer();
+    if (data === "menu") await sendWelcome(settings, chatId, callback.from);
+    else if (data === "manuals") await sendManuals(settings, chatId);
+    else await sendHelp(settings, chatId);
+    return;
+  }
+
+  const manualMatch = /^manual:(\d+)$/.exec(data);
+  if (manualMatch) {
+    const chatId = callback.message?.chat.id;
+    if (!chatId) return;
+    await answer();
+    await sendManual(settings, chatId, Number(manualMatch[1]));
     return;
   }
 

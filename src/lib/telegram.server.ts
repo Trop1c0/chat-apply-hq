@@ -1,5 +1,16 @@
 // Server-only Telegram Bot API helpers and application decision logic.
 
+export type Manual = {
+  title: string;
+  text?: string;
+  url?: string;
+};
+
+export type Moderator = {
+  label: string;
+  url: string;
+};
+
 export type BotSettings = {
   bot_token: string | null;
   admin_group_id: string | null;
@@ -9,6 +20,12 @@ export type BotSettings = {
   questions: string[];
   approve_template: string;
   reject_template: string;
+  manuals_banner_url: string | null;
+  manuals_intro: string;
+  manuals: Manual[];
+  help_banner_url: string | null;
+  help_intro: string;
+  moderators: Moderator[];
 };
 
 export type ApplicationRow = {
@@ -36,7 +53,9 @@ export async function loadSettings(): Promise<BotSettings> {
   const { data, error } = await db.from("bot_settings").select("*").eq("id", true).single();
   if (error) throw new Error(`Failed to load bot settings: ${error.message}`);
   const questions = Array.isArray(data.questions) ? (data.questions as string[]) : [];
-  return { ...data, questions } as BotSettings;
+  const manuals = Array.isArray(data.manuals) ? (data.manuals as Manual[]) : [];
+  const moderators = Array.isArray(data.moderators) ? (data.moderators as Moderator[]) : [];
+  return { ...data, questions, manuals, moderators } as BotSettings;
 }
 
 export async function telegramApi<T = any>(
@@ -60,6 +79,42 @@ export async function telegramApi<T = any>(
     throw new Error(`Telegram ${method} failed: ${detail}`);
   }
   return body.result as T;
+}
+
+export type InlineButton = { text: string; callback_data?: string; url?: string };
+
+/**
+ * Sends a photo-banner message with a text fallback (used for every
+ * bot "screen": welcome, manuals list, a single manual, help).
+ */
+export async function sendBannerMessage(
+  botToken: string,
+  chatId: number,
+  bannerUrl: string | null,
+  text: string,
+  keyboard?: InlineButton[][],
+): Promise<void> {
+  const reply_markup = keyboard ? { inline_keyboard: keyboard } : undefined;
+  if (bannerUrl) {
+    try {
+      await telegramApi(botToken, "sendPhoto", {
+        chat_id: chatId,
+        photo: bannerUrl,
+        caption: text,
+        parse_mode: "HTML",
+        reply_markup,
+      });
+      return;
+    } catch (error) {
+      console.error("sendPhoto failed, falling back to text message", error);
+    }
+  }
+  await telegramApi(botToken, "sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    reply_markup,
+  });
 }
 
 const KEYCAPS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];

@@ -11,7 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { getSettings, registerWebhook, saveSettings } from "@/lib/admin.functions";
+import {
+  getSettings,
+  registerWebhook,
+  saveSettings,
+  type ManualSetting,
+  type ModeratorSetting,
+} from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -91,6 +97,12 @@ function SettingsPage() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [approveTemplate, setApproveTemplate] = useState("");
   const [rejectTemplate, setRejectTemplate] = useState("");
+  const [manualsBannerUrl, setManualsBannerUrl] = useState("");
+  const [manualsIntro, setManualsIntro] = useState("");
+  const [manuals, setManuals] = useState<ManualSetting[]>([]);
+  const [helpBannerUrl, setHelpBannerUrl] = useState("");
+  const [helpIntro, setHelpIntro] = useState("");
+  const [moderators, setModerators] = useState<ModeratorSetting[]>([]);
 
   useEffect(() => {
     if (!data) return;
@@ -100,6 +112,12 @@ function SettingsPage() {
     setQuestions(data.questions);
     setApproveTemplate(data.approveTemplate);
     setRejectTemplate(data.rejectTemplate);
+    setManualsBannerUrl(data.manualsBannerUrl);
+    setManualsIntro(data.manualsIntro);
+    setManuals(data.manuals);
+    setHelpBannerUrl(data.helpBannerUrl);
+    setHelpIntro(data.helpIntro);
+    setModerators(data.moderators);
   }, [data]);
 
   const save = useMutation({
@@ -113,6 +131,16 @@ function SettingsPage() {
           questions: questions.map((question) => question.trim()).filter((q) => q.length > 0),
           approveTemplate,
           rejectTemplate,
+          manualsBannerUrl: manualsBannerUrl.trim(),
+          manualsIntro,
+          manuals: manuals
+            .map((manual) => ({ title: manual.title.trim(), text: manual.text.trim(), url: manual.url.trim() }))
+            .filter((manual) => manual.title.length > 0),
+          helpBannerUrl: helpBannerUrl.trim(),
+          helpIntro,
+          moderators: moderators
+            .map((moderator) => ({ label: moderator.label.trim(), url: moderator.url.trim() }))
+            .filter((moderator) => moderator.label.length > 0 && moderator.url.length > 0),
         },
       }),
     onSuccess: () => {
@@ -245,6 +273,72 @@ function SettingsPage() {
               <Plus className="size-4" /> Добавить вопрос
             </Button>
           </Section>
+
+          <Section
+            title="Мануалы"
+            description="Кнопка «Мануалы» появляется в главном меню после одобрения заявки."
+          >
+            <div className="space-y-1.5">
+              <Label>Баннер-картинка (URL, необязательно)</Label>
+              <Input
+                placeholder="https://…/manuals-banner.png"
+                value={manualsBannerUrl}
+                onChange={(event) => setManualsBannerUrl(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Текст-описание</Label>
+              <Textarea rows={3} value={manualsIntro} onChange={(event) => setManualsIntro(event.target.value)} />
+            </div>
+            {manuals.map((manual, index) => (
+              <div key={index} className="space-y-2 rounded-lg border border-border p-3">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Название кнопки, напр. 📘 Основной мануал"
+                    value={manual.title}
+                    onChange={(event) =>
+                      setManuals(
+                        manuals.map((m, i) => (i === index ? { ...m, title: event.target.value } : m)),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setManuals(manuals.filter((_, i) => i !== index))}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+                <Textarea
+                  rows={3}
+                  placeholder="Текст мануала, который бот отправит по нажатию кнопки"
+                  value={manual.text}
+                  onChange={(event) =>
+                    setManuals(manuals.map((m, i) => (i === index ? { ...m, text: event.target.value } : m)))
+                  }
+                />
+                <Input
+                  placeholder="Ссылка (необязательно) — если указана, кнопка ведёт по ссылке вместо текста"
+                  value={manual.url}
+                  onChange={(event) =>
+                    setManuals(manuals.map((m, i) => (i === index ? { ...m, url: event.target.value } : m)))
+                  }
+                />
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={manuals.length >= 15}
+              onClick={() => setManuals([...manuals, { title: "", text: "", url: "" }])}
+            >
+              <Plus className="size-4" /> Добавить мануал
+            </Button>
+          </Section>
         </div>
 
         <div className="space-y-4">
@@ -268,6 +362,62 @@ function SettingsPage() {
                 onChange={(event) => setRejectTemplate(event.target.value)}
               />
             </div>
+          </Section>
+
+          <Section
+            title="Помощь"
+            description="Кнопка «Помощь» появляется в главном меню после одобрения заявки и ведёт к списку модераторов."
+          >
+            <div className="space-y-1.5">
+              <Label>Баннер-картинка (URL, необязательно)</Label>
+              <Input
+                placeholder="https://…/help-banner.png"
+                value={helpBannerUrl}
+                onChange={(event) => setHelpBannerUrl(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Текст-описание</Label>
+              <Textarea rows={3} value={helpIntro} onChange={(event) => setHelpIntro(event.target.value)} />
+            </div>
+            {moderators.map((moderator, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  placeholder="Название кнопки, напр. 🛡 Модератор Madwor"
+                  value={moderator.label}
+                  onChange={(event) =>
+                    setModerators(
+                      moderators.map((m, i) => (i === index ? { ...m, label: event.target.value } : m)),
+                    )
+                  }
+                />
+                <Input
+                  placeholder="https://t.me/username"
+                  value={moderator.url}
+                  onChange={(event) =>
+                    setModerators(moderators.map((m, i) => (i === index ? { ...m, url: event.target.value } : m)))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setModerators(moderators.filter((_, i) => i !== index))}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={moderators.length >= 15}
+              onClick={() => setModerators([...moderators, { label: "", url: "" }])}
+            >
+              <Plus className="size-4" /> Добавить модератора
+            </Button>
           </Section>
 
           <Section
