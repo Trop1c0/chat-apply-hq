@@ -13,6 +13,9 @@ import {
   type InlineButton,
 } from "@/lib/telegram.server";
 
+const MANUALS_BUTTON_TEXT = "📗 Мануалы";
+const HELP_BUTTON_TEXT = "❗ Мне нужна помощь";
+
 type TelegramUser = {
   id: number;
   first_name?: string;
@@ -82,16 +85,15 @@ async function sendWelcome(settings: BotSettings, chatId: number, user: Telegram
     `📋 Статус заявки: ${statusLabel}`,
   ].join("\n");
 
-  const keyboard: InlineButton[][] = approved
-    ? [
-        [
-          { text: "📘 Мануалы", callback_data: "manuals" },
-          { text: "🆘 Помощь", callback_data: "help" },
-        ],
-      ]
-    : [[{ text: "📝 Подать заявку", callback_data: "apply" }]];
+  const reply_markup = approved
+    ? {
+        keyboard: [[{ text: MANUALS_BUTTON_TEXT }, { text: HELP_BUTTON_TEXT }]],
+        resize_keyboard: true,
+        is_persistent: true,
+      }
+    : { inline_keyboard: [[{ text: "📝 Подать заявку", callback_data: "apply" }]] };
 
-  await sendBannerMessage(settings.bot_token, chatId, settings.welcome_image_url, caption, keyboard);
+  await sendBannerMessage(settings.bot_token, chatId, settings.welcome_image_url, caption, reply_markup);
 }
 
 async function sendManuals(settings: BotSettings, chatId: number) {
@@ -101,7 +103,9 @@ async function sendManuals(settings: BotSettings, chatId: number) {
     manual.url ? { text: manual.title, url: manual.url } : { text: manual.title, callback_data: `manual:${index}` },
   ]);
   keyboard.push([{ text: "◀️ Назад", callback_data: "menu" }]);
-  await sendBannerMessage(settings.bot_token, chatId, settings.manuals_banner_url, text, keyboard);
+  await sendBannerMessage(settings.bot_token, chatId, settings.manuals_banner_url, text, {
+    inline_keyboard: keyboard,
+  });
 }
 
 async function sendManual(settings: BotSettings, chatId: number, index: number) {
@@ -109,9 +113,9 @@ async function sendManual(settings: BotSettings, chatId: number, index: number) 
   const manual = settings.manuals[index];
   if (!manual) return;
   const text = [`📘 <b>${escapeHtml(manual.title)}</b>`, "", escapeHtml(manual.text ?? "")].join("\n");
-  await sendBannerMessage(settings.bot_token, chatId, null, text, [
-    [{ text: "◀️ Назад", callback_data: "manuals" }],
-  ]);
+  await sendBannerMessage(settings.bot_token, chatId, null, text, {
+    inline_keyboard: [[{ text: "◀️ Назад", callback_data: "manuals" }]],
+  });
 }
 
 async function sendHelp(settings: BotSettings, chatId: number) {
@@ -121,7 +125,9 @@ async function sendHelp(settings: BotSettings, chatId: number) {
     { text: moderator.label, url: moderator.url },
   ]);
   keyboard.push([{ text: "◀️ Назад", callback_data: "menu" }]);
-  await sendBannerMessage(settings.bot_token, chatId, settings.help_banner_url, text, keyboard);
+  await sendBannerMessage(settings.bot_token, chatId, settings.help_banner_url, text, {
+    inline_keyboard: keyboard,
+  });
 }
 
 async function askQuestion(settings: BotSettings, chatId: number, step: number) {
@@ -160,6 +166,16 @@ async function handleMessage(settings: BotSettings, update: TelegramUpdate) {
       active: false,
     });
     await sendWelcome(settings, chatId, message.from);
+    return;
+  }
+
+  if (text === MANUALS_BUTTON_TEXT) {
+    await sendManuals(settings, chatId);
+    return;
+  }
+
+  if (text === HELP_BUTTON_TEXT) {
+    await sendHelp(settings, chatId);
     return;
   }
 

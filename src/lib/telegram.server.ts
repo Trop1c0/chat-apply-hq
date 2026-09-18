@@ -83,6 +83,10 @@ export async function telegramApi<T = any>(
 
 export type InlineButton = { text: string; callback_data?: string; url?: string };
 
+export type TelegramReplyMarkup =
+  | { inline_keyboard: InlineButton[][] }
+  | { keyboard: { text: string }[][]; resize_keyboard?: boolean; is_persistent?: boolean };
+
 /**
  * Sends a photo-banner message with a text fallback (used for every
  * bot "screen": welcome, manuals list, a single manual, help).
@@ -92,9 +96,8 @@ export async function sendBannerMessage(
   chatId: number,
   bannerUrl: string | null,
   text: string,
-  keyboard?: InlineButton[][],
+  reply_markup?: TelegramReplyMarkup,
 ): Promise<void> {
-  const reply_markup = keyboard ? { inline_keyboard: keyboard } : undefined;
   if (bannerUrl) {
     try {
       await telegramApi(botToken, "sendPhoto", {
