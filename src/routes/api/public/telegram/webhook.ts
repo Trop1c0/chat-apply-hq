@@ -85,21 +85,26 @@ async function sendWelcome(settings: BotSettings, chatId: number, user: Telegram
     : { inline_keyboard: [[{ text: "📝 Подать заявку", callback_data: "apply" }]] };
 
   if (settings.welcome_image_url) {
-    await telegramApi(settings.bot_token, "sendPhoto", {
-      chat_id: chatId,
-      photo: settings.welcome_image_url,
-      caption,
-      parse_mode: "HTML",
-      reply_markup,
-    });
-  } else {
-    await telegramApi(settings.bot_token, "sendMessage", {
-      chat_id: chatId,
-      text: caption,
-      parse_mode: "HTML",
-      reply_markup,
-    });
+    try {
+      await telegramApi(settings.bot_token, "sendPhoto", {
+        chat_id: chatId,
+        photo: settings.welcome_image_url,
+        caption,
+        parse_mode: "HTML",
+        reply_markup,
+      });
+      return;
+    } catch (error) {
+      console.error("sendPhoto failed, falling back to text welcome", error);
+    }
   }
+
+  await telegramApi(settings.bot_token, "sendMessage", {
+    chat_id: chatId,
+    text: caption,
+    parse_mode: "HTML",
+    reply_markup,
+  });
 }
 
 async function askQuestion(settings: BotSettings, chatId: number, step: number) {
